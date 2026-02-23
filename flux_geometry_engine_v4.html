@@ -1,0 +1,125 @@
+/* SECURITY BYPASS FOR REVIEW:
+  The following password gate is active in production environments.
+  Password: Pen1-House2-Ball3
+*/
+/*
+  (function() {
+    var key = "S2VrMjAyNg=="; 
+    var attempt = prompt("Enter Password to access the Flux Geometry Engine:");
+    if (btoa(attempt) !== key) {
+      alert("Access Denied.");
+      document.body.innerHTML = "<h1>Unauthorized Access</h1>";
+      window.stop();
+    }
+  })();
+*/
+
+  function copyToClipboard() {
+    const text = document.getElementById('descriptionText').innerText;
+    if(text.includes("Waiting") || text.includes("Error")) return alert("Nothing to copy yet!");
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.getElementById('copyBtn');
+      btn.innerText = "COPIED!";
+      btn.style.background = "#03dab6";
+      setTimeout(() => { 
+        btn.innerText = "COPY TO CLIPBOARD"; 
+        btn.style.background = "#007bff";
+      }, 2000);
+    });
+  }
+</script>
+
+<style>
+  body { font-family: sans-serif; background: #121212; color: #e0e0e0; padding: 20px; }
+  .container { max-width: 600px; margin: auto; text-align: center; }
+  input, button { margin: 10px 0; padding: 12px; width: 100%; border-radius: 8px; border: none; transition: 0.3s; }
+  .main-btn { background: #6200ee; color: white; cursor: pointer; font-weight: bold; }
+  .copy-btn { background: #007bff; color: white; cursor: pointer; font-weight: bold; margin-top: 10px; }
+  #preview { max-width: 100%; border-radius: 8px; margin-top: 10px; display: none; border: 1px solid #333; }
+  #outputBox { background: #1e1e1e; border-left: 5px solid #03dab6; padding: 15px; text-align: left; margin-top: 20px; min-height: 100px; }
+  #status { color: #03dab6; font-weight: bold; font-size: 0.9em; }
+</style>
+
+<div class="container">
+  <h1>Flux Geometry Engine V4</h1>
+  <p>Status: <span id="status">Secure</span></p>
+  
+  <input type="file" id="imageUpload" accept="image/*" onchange="previewImage(event)">
+  <img id="preview" src="#" alt="Image Preview">
+  
+  <button class="main-btn" onclick="interrogateImage()">ANALYZE POSE</button>
+  
+  <div id="outputBox">
+    <p id="descriptionText" style="white-space: pre-wrap;">Waiting for image analysis...</p>
+    <button id="copyBtn" class="copy-btn" onclick="copyToClipboard()">COPY TO CLIPBOARD</button>
+  </div>
+</div>
+
+<script>
+  function previewImage(event) {
+    const reader = new FileReader();
+    reader.onload = function(){
+      const preview = document.getElementById('preview');
+      preview.src = reader.result;
+      preview.style.display = 'block';
+    }
+    reader.readAsDataURL(event.target.files[0]);
+  }
+
+  async function interrogateImage() {
+    const fileInput = document.getElementById('imageUpload');
+    const output = document.getElementById('descriptionText');
+    const status = document.getElementById('status');
+    const apiKey = "YOUR_FAL_AI_API_KEY_HERE";    
+    if (!fileInput.files[0]) return alert("Please select an image first!");
+    
+    status.innerText = "PROCESSING...";
+    output.innerText = "Contacting Moondream Cloud with JWT Token...";
+
+    try {
+      const base64Data = await toBase64(fileInput.files[0]);
+      
+      const response = await fetch('https://api.moondream.ai/v1/query', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + apiKey
+        },
+        body: JSON.stringify({
+          image_url: `data:image/jpeg;base64,${base64Data}`,
+          question: "Describe the image as a dense text-to-image prompt. Focus on: 1. Camera Framing (shot type, angle). 2. Subject Pose (describe the visible silhouette, limb placement, and head tilt precisely). 3. Lighting (direction, intensity). Style guide: Use definitive, affirmative language only. Do not describe what is missing. Use cinematic vocabulary (e.g. 'cinematic lighting', 'sharp details') naturally. Do not use the words 'rendered' or 'minimal'. Output as a single, flowing paragraph."
+        })
+
+
+      });
+
+      const data = await response.json();
+      
+      if (data && data.answer) {
+        // This line deletes "The image shows" or "The image displays" automatically
+        let cleanText = data.answer.replace(/The image (shows|displays|depicts|features) /gi, "").trim();
+        
+        // Capitalize the first letter if it got cut off
+        cleanText = cleanText.charAt(0).toUpperCase() + cleanText.slice(1);
+        
+        output.innerText = cleanText;
+        status.innerText = "SUCCESS";
+
+      } else {
+        output.innerText = "API Error: " + (data.error || JSON.stringify(data));
+        status.innerText = "ERROR";
+      }
+      
+    } catch (err) {
+      output.innerText = "Connection Error: " + err.message;
+      status.innerText = "FAILED";
+    }
+  }
+
+  const toBase64 = file => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = error => reject(error);
+  });
+</script>
